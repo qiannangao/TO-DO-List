@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Vue.js • TodoMVC</title>
+    <link rel="stylesheet" href="./todo.css">
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+    </style>
+
+
+</head>
+
+<body>
+    <!-- v-cloak是为了隐藏未编译完成的模板语法（也就是页面加载完前用户看不到），在vue模板编译完成后消失 -->
+    <section class="todoapp" v-cloak>
+        <header class="header">
+            <h1>todos</h1>
+            <input class="new-todo" autofocus autocomplete="off" placeholder="What needs to be done?" @change="add">
+        </header>
+        <section class="main">
+            <!-- v-model绑定一个多选框时，绑定的属性值应是一个布尔值 -->
+            <input id="toggle-all" class="toggle-all" type="checkbox" v-model="allDone">
+            <label for="toggle-all">Mark all as complete</label>
+            <ul class="todo-list">
+                <!-- 当前data中的n和item相同 -->
+                <li :class="['todo',{completed:item.done,editing:n==item}]" v-for="(item,index) in filterList"
+                    :key="item.id">
+                    <div class="view">
+                        <input type="checkbox" class="toggle" v-model="item.done">
+                        <!-- 此时的n存储了item对象 -->
+                        <label @dblclick="n=item">{{item.txt}}</label>
+                        <button class="destroy" @click="delItem(index)"></button>
+                    </div>
+                    <!-- 编辑时获取焦点(当点击的元素和item相等) -->
+                    <!-- 编辑完毕按回车/失去焦点，都改变状态  -->
+                    <!-- 按下esc希望让内容还原;添加按下键盘事件的时候，还需要让给v-model添加lazy修饰符，因为按下esc并没有触发change事件（change事件只有输入enter或者失去焦点才触发），lazy修饰符是将input事件改为change事件 -->
+                    <input class="edit" type="text" v-model.lazy="item.txt" v-focus="n==item" @change="n=null"
+                        @blur="n=null" @keydown.esc="n=null">
+
+                </li>
+                <!-- completed 完成的类名   editing 编辑时的类名 -->
+                <!--
+                    <li class="todo completed">
+                        <div class="view">
+                            <input class="toggle" type="checkbox">
+                            <label>完成示例</label>
+                            <button class="destroy"></button>
+                        </div>
+                        <input class="edit" type="text">
+                    </li> -->
+            </ul>
+        </section>
+        <footer class="footer">
+            <span class="todo-count">
+                <!--计算属性定义的时候定义成方法格式，使用的时候当作属性使用  -->
+                <strong>{{uncompleted.length}}</strong> {{pluralize('item', 0)}} to-do
+            </span>
+            <ul class="filters">
+                <!-- selected 表示当前选项 -->
+                <!-- 相当于导航栏的点击 -->
+                <li><a :class="{selected:type=='all'}"  href="#/all" @click="type='all'">All</a></li>
+                <li><a :class="{selected:type=='active'}" href="#/active" @click="type='active'">Uncompleted</a></li>
+                <li><a :class="{selected:type=='completed'}" href="#/completed" @click="type='completed'">Completed</a></li>
+            </ul>
+            <!-- 清除已完成的是点击时展现未完成的;uncompleted返回的是未完成的数组 -->
+            <button class="clear-completed" @click="todoList=uncompleted">
+                Clear completed
+            </button>
+        </footer>
+    </section>
+    <footer class="info">
+        <p>Double-click to edit a todo</p>
+        <p>Written by <a href="http://evanyou.me">Evan You</a></p>
+        <p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
+    </footer>
+    <script src="./lib/vue.js"></script>
+    <script>
+        // todoList数据格式 done是否选中，txt是输入框中的文本，id是每一项的唯一id值
+        new Vue({
+            data() {
+                return {
+                    todoList:JSON.parse(localStorage.getItem('todoList'))||[],
+                    n: null,
+                    type:'all'
+                }
+            },
+            watch:{
+todoList:{
+    deep:true,
+    handler(newValue){
+        // 只传一个值时是新值
+        localStorage.setItem('todoList',JSON.stringify(newValue))
+    }
+}
+            },
+            methods: {
+                // 工具函数，让单词变复数形式
+                pluralize(word, count) {
+                    return count === 1 ? word : word + 's';
+                },
+                // 添加待办事项
+                add(e) {
+                    //    获取输入框的值放入data中的todoList数组中
+                    var todo = {
+                        done: false,
+                        txt: e.target.value,
+                        id: Date.now()
+                    }
+                    this.todoList.push(todo);
+                    e.target.value = '';//输入完清空内容
+                },
+               
+                    //   数组名.splice(索引， 要删除的个数) ：从索引位置删除几个元素；
+                    delItem(i){
+                        this.todoList.splice(i,1);
+                    }
+
+            },
+            directives: {
+                focus: {
+                    // 更新时调用该钩子函数
+                    update(el, binding) {
+                        // binding是绑定相关的值
+                        // item=n时value值为true
+                        if (binding.value) {
+                            // 获取焦点
+                            el.focus()
+                        }
+                    }
+                }
+            },
+            computed: {
+                // 获取未完成的数组
+                uncompleted() {
+                    // 过滤出done属性为false的所有item项
+                    return this.todoList.filter(item => item.done == false)
+                },
+                allDone: {
+                    get() {
+                        // 待办列表每一项都为真则为真
+                        return this.todoList.every(item => item.done == true);
+                    },
+                    set(value) {
+                        // 全选按钮选中时，遍历列表每一项控制和全选按钮值一样
+                        this.todoList.forEach(item => {
+                            item.done = value;
+                        })
+                    }
+                },
+                filterList(){
+                    // 过滤出三种类型
+                    if(this.type=='all'){
+                        return this.todoList;
+                    }else if(this.type=='active'){
+                        // 过滤属性中的方法也被添加到了vue实例中
+                        return this.uncompleted;
+                    }else{
+                        console.log(666);
+                        return this.todoList.filter(item => item.done == true)
+                    }
+                }
+            }
+
+        }).$mount('.todoapp');
+
+    </script>
+</body>
+
+</html>
